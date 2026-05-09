@@ -1,0 +1,10 @@
+Hephaestus credits the following upstream sources:
+
+- K-Scale Labs (https://github.com/kscalelabs), MIT-licensed humanoid robotics
+  reference designs, RL training infra (ksim), URDF/MJCF tooling. Various repos
+  archived locally for reference; Hephaestus does not redistribute K-Scale code.
+- Henrique Ferrolho (https://github.com/ferrolho/VL53L5CX-BNO08X-viewer), MIT-
+  licensed reference implementation of the BNO085 + VL53L5CX sensor combo and
+  viser-based 3D viewer that informed the per-segment perception architecture.
+- build123d (https://github.com/gumyr/build123d), Apache 2.0 parametric Python
+  CAD library used as the design substrate.
