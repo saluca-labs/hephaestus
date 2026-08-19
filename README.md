@@ -39,7 +39,7 @@ This generates the lens-mount male and female parts and writes STL, STEP, and ma
 
 ```
 hephaestus/
-  LICENSE              MIT
+  LICENSE              FSL-1.1-Apache
   NOTICE               upstream credits
   README.md            this file
   design/
@@ -57,7 +57,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the locked architectural de
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+FSL-1.1-Apache (converts to Apache 2.0 after two years). See [LICENSE](LICENSE).
 
 ## Attribution
 
