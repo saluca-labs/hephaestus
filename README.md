@@ -14,7 +14,55 @@ What the code on `main` does, checked 2026-10-22 at `cfdb8e0`: one part, the len
 
 **Known issue, found 2026-10-22.** The generated geometry has **one** tab on the male part and **one** pass-through slot on the female part, not the three that `lens_mount.py` describes (`n_tabs=3`). In `_male_tabs` and `_female_pass_slots`, each wedge is rotated and then positioned with `locate(Location((0, 0, z)))`, which sets an absolute location and discards the rotation, so all three wedges land on the same 0 to 50 degree arc and fuse into one. Measured: the fused tab solid has the volume of exactly one wedge (173.44 mm^3). The preview under [Screenshots](#screenshots) shows the single tab. No fix is in this repository yet.
 
+**Known issue, found 2026-10-22 (phase 2 docs pass).** The two halves as generated do not interlock. The female collar has the same 50 mm outer diameter and 44 mm bore as the male collar (both come from `_bayonet_collar`), so neither collar fits inside the other. The female cutters (`_female_pass_slots`, `_female_back_channel`) span radius 24.7 to 28.3 mm, which is almost entirely outside the collar wall (radius 22 to 25 mm): they remove only a 0.3 mm skin from the outside of the collar and a 0.3 mm notch under the flange, 189.77 mm^3 in total, measured. The male tab (radius 25 to 28 mm) therefore has no female slot or channel to enter. The module docstring's "matching pass-through slots plus a back channel that captures the tabs" describes the intent, not the geometry. No fix is in this repository yet.
+
+Both measurements re-derive from the code with this script, run from the repository root:
+
+```python
+from design import lens_mount as lm
+
+p = lm.LensMountParams()
+tabs = lm._male_tabs(p)
+one = lm._wedge(p.bayonet_collar_dia / 2, p.bayonet_collar_dia / 2 + p.tab_radial_thick,
+                p.tab_axial_thick, p.tab_arc_deg)
+print(f"tabs={tabs.volume:.2f} one_wedge={one.volume:.2f} mm^3")
+plain = lm._flange_disc(p).fuse(lm._bayonet_collar(p))
+cut = plain.cut(lm._female_pass_slots(p)).cut(lm._female_back_channel(p))
+print(f"female cuts remove {plain.volume - cut.volume:.2f} mm^3")
+```
+
+Real output, 2026-10-22, build123d 0.13.0:
+
+```text
+tabs=173.44 one_wedge=173.44 mm^3
+female cuts remove 189.77 mm^3
+```
+
 The last hardware status written here (2026-05-08): sensor breadboard validation pending parts; fab tooling (a large-format FDM printer and a desktop CNC) on order, not delivered; no segment electronics built, no URDF emitted, no joint actuator family selected. Nothing in the repository records a later change.
+
+## How it works
+
+`python -m design.build_all` is the only entry point. Traced from `design/build_all.py` and `design/lens_mount.py`:
+
+```mermaid
+flowchart TD
+  CLI["python -m design.build_all<br/>build_all.main()"] --> LM["LensMount(side)<br/>side = male, then female"]
+  P["LensMountParams()<br/>default dimensions"] --> LM
+  LM --> EXP["LensMount.export(design/build)"]
+  EXP --> B["LensMount.build()"]
+  B --> F["_flange_disc fused with _bayonet_collar"]
+  F -->|male| MT["fuse _male_tabs"]
+  F -->|female| FS["cut _female_pass_slots<br/>cut _female_back_channel"]
+  MT --> CP["fuse _contact_pads"]
+  FS --> CP
+  CP --> C["Compound lens_mount_side"]
+  C --> STL["export_stl<br/>lens_mount_male.stl, lens_mount_female.stl"]
+  C --> STEP["export_step<br/>lens_mount_male.step, lens_mount_female.step"]
+  STL --> PV["_try_render_preview<br/>trimesh.load, matplotlib Agg"]
+  PV --> PNG["lens_mount_preview.png"]
+```
+
+Every output lands in `design/build/` (gitignored). `_male_tabs`, `_female_pass_slots` and `_female_back_channel` each build their solids with `_wedge` (a revolved rectangle). If matplotlib or trimesh is missing, `_try_render_preview` prints `[preview] skipped` and the run still writes the four STL and STEP files.
 
 ## Install
 
