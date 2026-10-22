@@ -1,0 +1,311 @@
+# hephaestus
+
+> Design repository for a modular humanoid robot built from smart body segments. Today it contains one parametric part, a lens-mount bayonet coupling in build123d (Python CAD) that exports STL, STEP and a PNG preview, plus architecture and roadmap documents. FSL-1.1-ALv2.
+
+Facts agents often get wrong: this is pre-alpha design work, not a working robot; the only code is `design/lens_mount.py` and `design/build_all.py`; no electronics, firmware, URDF emitter or simulator integration exist yet, and the ARCHITECTURE and ROADMAP documents describe intent. As of 2026-10-22 the generated coupling has one tab and one slot instead of three (a known bug, see the README). The licence is FSL-1.1-ALv2 since 2026-08-18, not MIT. Install with `pip install build123d matplotlib trimesh`; there is no package metadata.
+
+## README.md
+
+# Hephaestus
+
+Modular humanoid robotics substrate: the open design home for a humanoid built from smart body segments, starting with a parametric lens-mount coupling generated in Python with build123d.
+
+> **Correction, 2026-10-22.** This README said the licence was MIT (in "Repo layout" and "License"). Since commit `cfdb8e0` (2026-08-18) the [LICENSE](LICENSE) file is the Functional Source License 1.1 with an Apache 2.0 future licence (FSL-1.1-ALv2). Commits before `cfdb8e0` were published with an MIT LICENSE file.
+>
+> **Correction, 2026-10-22.** The quick start said that `pip install build123d` followed by `python -m design.build_all` writes STL, STEP and PNG previews. With only build123d installed, the PNG preview is skipped (`[preview] skipped: ModuleNotFoundError("No module named 'matplotlib'")`); the preview also needs `matplotlib` and `trimesh`. The install line below includes them.
+
+## Status
+
+Pre-alpha, exploratory R&D. Phase 0 in flight.
+
+What the code on `main` does, checked 2026-10-22 at `cfdb8e0`: one part, the lens-mount coupling (`design/lens_mount.py`), builds in male and female versions and exports watertight STL meshes, STEP files and a preview PNG. Nothing else in the repository is code; every other item below is design intent from [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+
+**Known issue, found 2026-10-22.** The generated geometry has **one** tab on the male part and **one** pass-through slot on the female part, not the three that `lens_mount.py` describes (`n_tabs=3`). In `_male_tabs` and `_female_pass_slots`, each wedge is rotated and then positioned with `locate(Location((0, 0, z)))`, which sets an absolute location and discards the rotation, so all three wedges land on the same 0 to 50 degree arc and fuse into one. Measured: the fused tab solid has the volume of exactly one wedge (173.44 mm^3). The preview under [Screenshots](#screenshots) shows the single tab. No fix is in this repository yet.
+
+The last hardware status written here (2026-05-08): sensor breadboard validation pending parts; fab tooling (a large-format FDM printer and a desktop CNC) on order, not delivered; no segment electronics built, no URDF emitted, no joint actuator family selected. Nothing in the repository records a later change.
+
+## Install
+
+```bash
+git clone https://github.com/saluca-labs/hephaestus
+cd hephaestus
+python -m venv .venv && . .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install build123d matplotlib trimesh
+```
+
+Tested 2026-10-22 with Python 3.12.10 on Windows 11, build123d 0.13.0, matplotlib 3.11.2 and trimesh 5.1.1. `matplotlib` and `trimesh` are only needed for the PNG preview. There is no `pyproject.toml` or `requirements.txt` yet.
+
+## Quickstart
+
+```bash
+python -m design.build_all
+```
+
+This generates the lens-mount male and female parts and writes STL, STEP and a matplotlib PNG preview into `design/build/` (gitignored). Real output, 2026-10-22 (the last line, which prints the absolute output path, is shortened here):
+
+```text
+[build] male   stl  lens_mount_male.stl               376.6 KiB  (0.16s total for side)
+[build] male   step lens_mount_male.step              131.5 KiB  (0.16s total for side)
+[build] female stl  lens_mount_female.stl             394.3 KiB  (0.16s total for side)
+[build] female step lens_mount_female.step            142.3 KiB  (0.16s total for side)
+[build] preview      lens_mount_preview.png            195.8 KiB
+
+wrote 5 artifact(s) to .../hephaestus/design/build
+```
+
+## Usage
+
+Every dimension is a field of `LensMountParams` (millimetres and degrees): flange diameter and depth, bore, tab count, arc and thickness, slot clearances, screw holes, and the contact-pad ring. Build a variant from Python:
+
+```python
+from design.lens_mount import LensMount, LensMountParams
+
+params = LensMountParams(n_contacts=6, contact_arc_deg=90.0)
+mount = LensMount(side="female", params=params)
+paths = mount.export("out")
+print(sorted(paths))
+solid = mount.build()
+print(f"volume={solid.volume:.1f} mm^3")
+```
+
+Real output, 2026-10-22:
+
+```text
+['step', 'stl']
+volume=8353.9 mm^3
+```
+
+`export()` writes `lens_mount_<side>.stl` and `.step` into the given directory and returns their paths. `build()` returns the build123d `Compound`.
+
+## Architecture
+
+Hephaestus is the OSS home for a modular humanoid platform built from smart body segments that couple to each other through standardized mechanical and electrical interfaces. Each segment carries its own perception, power, and compute. The mechanical handshake between segments is a parametric lens-mount coupling generated from code, so the bayonet that joins a forearm to an upper arm comes out of the same Python file as the bayonet that joins a head to a torso.
+
+The project exists because most humanoid platforms today fall into one of two camps. Either they are monolithic, designed end to end by one team with a single controller and a single perception stack, which makes them hard to extend and harder to repair, or they are research toys that solve one joint and stop. Hephaestus aims for a third path: a federation of segments that each know their own state, fail independently, and can be swapped at the bayonet without redesigning the body. Read the architecture document for the full set of locked design calls.
+
+What makes the substrate different is that the geometry is code, not files. build123d is the source of truth; STL and STEP are downstream artifacts that get rebuilt from the Python every time. Couplings between segments use a lens-mount-style bayonet inspired by camera lens mounts, which buy decades of tolerancing and supply-chain know-how from the photography world. The design calls for every segment to carry its own ESP32-S3, IMU, and a ring of time-of-flight sensors, so perception is distributed across the body rather than concentrated in a single head-mounted camera. The substrate is intentionally agnostic about which actuator family powers the joints; that decision is curated separately and held open until the prototype runs need it.
+
+Design sketch (planned, not built; only the coupling exists as code):
+
+- Modular smart segments. Every body segment carries its own ESP32-S3, local battery, IMU, and time-of-flight sensor ring. Segments daisy-chain to a central torso bus.
+- Lens-mount-style electromechanical couplings between segments. Bayonet quarter-turn, EF-inspired, parametric. Carries mechanical load plus power plus I2C plus segment ID over a shared contact ring.
+- Distributed perception per segment. BNO085 IMU and four to six VL53L5CX 8x8 ToF sensors per segment, fused locally before reaching the torso aggregator.
+- Tripteron-style exo-shell harness as overlay above conventional rotational joints. Active ROM enforcement, redundant Cartesian sense, and gravity-comp / assist torque, without replacing the underlying joint.
+- Conventional rotational joints underneath. Knee and elbow are revolute; shoulder and hip default to ball joint or 3-RRR spherical, not tripteron.
+- build123d as parametric CAD source of truth. A custom emitter is planned to walk the build123d Compound graph and produce URDF / MJCF for simulator round-trip.
+- ksim (K-Scale Labs) for RL training in MuJoCo, with a stable interface back to torso companion compute.
+
+Repo layout:
+
+```
+hephaestus/
+  LICENSE              FSL-1.1-ALv2
+  NOTICE               upstream credits
+  README.md            this file
+  design/
+    __init__.py
+    lens_mount.py      first part: parametric bayonet coupling
+    build_all.py       runs every part's build() and writes outputs
+  docs/
+    ARCHITECTURE.md    locked decisions and open questions
+    ROADMAP.md         phased plan and per-phase deliverables
+    img/               captured images for this README
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the locked architectural decisions and the open questions that remain. See [docs/ROADMAP.md](docs/ROADMAP.md) for the phased delivery plan.
+
+## Screenshots
+
+![Matplotlib 3D preview written by build_all.py: the male lens-mount half on the left and the female half on the right, each a flanged ring with four screw holes and an arc of eight contact pads; the male part shows a single tab on its right-hand side](docs/img/lens-mount-preview-2026-10-22.png)
+
+This is the preview file `design/build/lens_mount_preview.png` that `python -m design.build_all` wrote on 2026-10-22 at `cfdb8e0`, copied unmodified. The command and versions are in [docs/img/lens-mount-preview-2026-10-22.txt](docs/img/lens-mount-preview-2026-10-22.txt). It is a render of generated geometry, not a photograph of hardware; no part has been fabricated as far as this repository records.
+
+## Citation
+
+No archived record yet.
+
+## License
+
+FSL-1.1-ALv2 (Functional Source License 1.1, Apache 2.0 future licence). See [LICENSE](LICENSE): use for any purpose other than a Competing Use, converting to Apache License 2.0 on the second anniversary of each version's release. GitHub shows this licence as "Other" because it does not auto-detect FSL. The LICENSE file names it "FSL-1.1-Apache"; FSL-1.1-ALv2 is its SPDX identifier.
+
+## Links
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): locked decisions and open questions
+- [docs/ROADMAP.md](docs/ROADMAP.md): phased plan
+- [NOTICE](NOTICE): upstream credits, including K-Scale Labs (Kbot reference geometry, ksim, urdf2mjcf), Henrique Ferrolho (VL53L5CX-BNO08X reference viewer), and the build123d project
+- [build123d](https://github.com/gumyr/build123d): the CAD library
+
+_Last updated: 2026-10-22_
+
+## docs/ARCHITECTURE.md
+
+# Architecture
+
+## Overview
+
+Hephaestus is a modular, sensor-rich humanoid substrate, designed in the open under MIT, intended to be assembled from a federation of smart body segments rather than as a single monolithic robot. The architecture treats the body as a graph of self-aware segments that handshake at standardized bayonet couplings, share a common bus for power and data, and report their state up to a central torso aggregator. The CAD geometry is parametric Python code, the simulator description is generated from that code, and the sensor stack is replicated per segment instead of concentrated in a head. The design is opinionated where opinions buy modularity and deferred where deferral preserves option value, with the joint actuator family being the most important deferred decision.
+
+This document captures the architectural calls that are locked, the questions that remain open, and the adjacencies that informed the design.
+
+> **Correction, 2026-10-22.** This document said Hephaestus is "designed in the open under MIT". Since commit `cfdb8e0` (2026-08-18) the repository is licensed under FSL-1.1-ALv2; see [LICENSE](../LICENSE). It also describes a `scale_factor` parameter as present across every part class; as of 2026-10-22 no `scale_factor` exists in the code (`LensMountParams` has none), and the roadmap lists threading it through as future work. Statements in this document describe the intended design, not built hardware.
+
+## Locked architectural decisions
+
+These calls are committed and should not be re-litigated without explicit reason.
+
+### Modular smart segments
+
+Each body segment carries its own ESP32-S3, local battery, IMU, and time-of-flight sensor ring, and daisy-chains to a central torso bus. There is no monolithic controller. The motivation is fault isolation, hot-swap, and per-segment perception. A failed segment should not stop the rest of the body, and a swapped segment should not require a flash of the whole robot. The segment is the unit of design, fab, and replacement.
+
+### Lens-mount-style electromechanical couplings
+
+Every segment-to-segment interface is a bayonet quarter-turn coupling, inspired by camera lens mounts (EF in particular). The coupling carries mechanical load, power rails, I2C lines, and a segment ID. It is parametric: a single Python module produces every variant from a small sensor-pod mount up to a hip-load-bearing mount, with size and contact pattern set by the call site rather than by a separate file per part. Borrowing a coupling pattern from photography buys decades of tolerancing know-how that humanoid robotics has not yet developed on its own.
+
+The first part shipped in this repo is the lens-mount coupling, male and female halves, in `design/lens_mount.py`.
+
+### Distributed perception per segment
+
+Every segment ships with a BNO085 nine-axis IMU and four to six VL53L5CX 8x8 time-of-flight sensors. The IMU lives near the segment's geometric center for clean orientation. One ToF aims into the joint cavity for redundant joint-angle sense. The remaining ToFs form an outward-facing ring for proximity and obstacle awareness. The IMU is shielded with a folded mu-metal enclosure to keep nearby motor magnetic fields from corrupting the magnetometer.
+
+The pattern is a deliberate counterweight to the conventional humanoid posture of overinvesting in head-mounted cameras and underinvesting in full-body proprioception. A body that knows where its own limbs are tends to fall less.
+
+### Tripteron-style exo-shell harness as overlay
+
+Conventional rotational joints carry the rotation. A 3-DOF translational parallel mechanism (tripteron) wraps each joint as an active overlay, providing range-of-motion enforcement, redundant Cartesian endpoint sense, and gravity-compensation or assist torques. The overlay couples to the limb through a passive ball joint so that the underlying revolute or spherical joint is not over-constrained.
+
+The overlay is research scope, not critical path. The exact set of joints that benefit from a tripteron overlay (probably shoulder and hip; probably skip knee and elbow) will be settled empirically.
+
+### Conventional rotational joints underneath
+
+Knee and elbow are revolute, with offset motor and belt or direct drive depending on the actuator pick. Shoulder and hip default to ball joint or 3-RRR spherical parallel mechanism (the rotational analog of tripteron), not tripteron itself. The wrist defaults to a 2-DOF revolute pair, with the option to expand if the end-effector decision moves toward a hand. Joint kinematics borrow topology from K-Scale Kbot (pitch-roll-yaw hip, no ankle roll) without copying exact dimensions.
+
+### 3-RRR spherical mechanism for shoulder, wrist, and head-base candidates
+
+3-RRR is a parallel rotational mechanism with three revolute-revolute-revolute legs, well suited to spherical workspaces. It is the rotational analog of tripteron: where tripteron solves three independent translations, 3-RRR solves three independent rotations. It is a research candidate for shoulder, wrist, and the head-base joint, with a ball-joint-with-three-tendon-actuators fallback if 3-RRR fab proves too tight on a desktop CNC.
+
+### Scapulothoracic plate as the one tripteron-as-primary-joint case
+
+The scapulothoracic complex in human anatomy is mostly translational rather than rotational. That makes it the one location on the body where tripteron is the right primary mechanism, not an overlay. Treating it as its own research path keeps the overlay-vs-primary distinction clean elsewhere.
+
+### Mu-metal shielding for IMU near motors
+
+BNO085 magnetometer drift inside a metal-bearing, motor-bearing segment is a known failure mode. The mitigation is a thin mu-metal foil enclosure folded into a three-walled box around the IMU, antenna face open. The exact tolerance for residual drift after shielding is an open question (see below), but the structural decision to shield is locked.
+
+### Half-scale prototypes, full-scale design
+
+The parametric build123d code defaults to full-scale dimensions. A `scale_factor` parameter, default 1.0, scales geometry uniformly across every part class; setting it to 0.5 produces a half-scale prototype. Joint torque calculations are sized for full-scale; prototype torques fall out roughly proportionally and give the actuator selection more flexibility on the prototype runs. The half-scale prototype maps roughly to the size class of well-known smaller humanoid research platforms, which is convenient for actuator-option sizing reference.
+
+The convention is that prototype runs use `scale_factor=0.5` while locked production geometry stays at `scale_factor=1.0`. The slicer and CAM operate on the post-scale STL or STEP, so the fab pipeline stays scale-agnostic.
+
+### build123d as parametric CAD source of truth
+
+Geometry is Python. STL, STEP, and PNG previews are downstream artifacts, regenerated from source on demand. Earlier experiments with Blender plus Phobos for URDF were abandoned. The motivation is the same one that drove infrastructure-as-code in software: a folder of binary CAD files is hard to diff, hard to compose, and hard to reproduce, while a Python package is all three.
+
+### Custom URDF / MJCF emitter that reads from the build123d Compound graph
+
+Rather than maintain a hand-edited URDF in parallel with the geometry, a custom emitter walks the assembled build123d Compound recursively, treats each labeled part as a URDF link, extracts mass and inertia tensor from the geometry itself, emits joint blocks at lens-mount mating pairs, and references the exported STL files from the URDF. For MJCF, the K-Scale `urdf2mjcf` converter handles the final stage, so the emitter only ever produces URDF and the converter bridges to MuJoCo.
+
+### ksim for sim integration
+
+The K-Scale Labs ksim training infrastructure is the simulator and policy training stack. ksim is JAX-based, runs on a single CUDA GPU, and ships with reference configurations for similar humanoid topologies. Borrowing ksim removes the temptation to roll a custom training stack and keeps focus on the substrate.
+
+## Open architectural questions
+
+These are the calls that are deliberately deferred because deferring them preserves option value or because empirical data is needed first.
+
+### Joint actuator selection (deferred)
+
+The joint actuator family dominates total cost, walking gait quality, and integration effort. A curated option set has been captured separately; it spans custom BLDC plus harmonic drive, harvested or aftermarket motors from existing quadruped platforms, off-the-shelf serial-bus servos, sealed commercial modules, mid-cost CAN-driven brushless designs, hobbyist FOC builds, and PCB-stator axial-flux as an OSS-aligned in-joint direct-drive option. Each option carries its own tradeoff between cost, integration effort, supply chain, and torque density.
+
+The substrate work (couplings, segment shells, sensor pods, build123d library, URDF emitter, power distribution) proceeds against the curated table without locking the choice. Final selection is reserved for a dedicated session once prototype runs need it.
+
+### Bus protocol
+
+The segment-to-torso bus could be RS-485, CAN, or ESP-NOW. RS-485 is the most boring choice and probably the right one for a wired body, but the time-of-flight frame bandwidth at scale (twelve segments, four to six ToF each, 10 Hz) may exceed what RS-485 handles cleanly without compression or downsampling. CAN is the obvious alternative; ESP-NOW would be wireless per segment but loses the I2C-on-the-bayonet idea. The decision is held until the first segment node firmware exists and bandwidth is measured rather than estimated.
+
+### Pi 5 vs Jetson Orin Nano for torso companion compute
+
+The torso aggregator runs the bus master, the state estimator, the high-level control loop, and the persona-layer endpoint. Pi 5 is cheaper and lower power and is fine for sensor aggregation plus light control. Jetson Orin Nano adds a GPU for on-board policy inference at roughly twice the cost and power. The default plan is to start with Pi 5 and swap to Jetson only if RL policy inference becomes the bottleneck.
+
+### End-effectors for v1
+
+The choice is between a rod stub and an actual hand for the first build. A rod stub is days of work, lets the body walk and balance and gesture without solving manipulation, and swaps out at the lens-mount coupling without forearm redesign. A five-finger underactuated hand is a four-to-twelve-week sub-project on its own. A parallel-jaw gripper sits in the middle. The default current plan is rod stub for v1, with a later hand or gripper dropping in as a swap. The call is genuinely open because it changes the wrist-DOF count.
+
+## What is intentionally out of scope here
+
+Future persona integration (the eventual binding of an agent identity to the embodied surface) is deferred. When that work happens, it will live behind a stable interface in a separate, possibly private, package, with the public body code calling into it. The decision keeps this repository focused on the substrate, where the OSS posture has clear leverage, and keeps the persona-binding work where it belongs.
+
+## Adjacencies
+
+These are the prior-art references that shaped the architecture without being copied wholesale.
+
+- **K-Scale Labs Kbot.** Reference geometry for hip topology (pitch-roll-yaw, no ankle roll), reference URDF shape for the emitter to validate against, ksim and urdf2mjcf as upstream training and conversion infrastructure. K-Scale's posture (MIT license, OSS humanoid platform) directly motivates Hephaestus's posture.
+- **Henrique Ferrolho's VL53L5CX-BNO08X-viewer.** Reference repository for combining a BNO085 IMU and a VL53L5CX time-of-flight array on an ESP32 with a Python viser viewer. The breadboard validation path for the sensor pod follows this layout closely.
+- **build123d.** The parametric CAD library that the geometry source-of-truth invariant rests on. Apache 2.0 upstream.
+
+Other reference threads (parallel mechanism literature, lens-mount tolerance practice, distributed-perception robotics work) sit further out and are surfaced piece by piece in the roadmap.
+
+## docs/ROADMAP.md
+
+# Hephaestus roadmap
+
+## Status
+
+Phase 0 is in flight. The first mechanical part has been parametrized and is exporting clean STL, STEP, and PNG previews. Sensor breadboard validation is pending parts. Fab tooling (large-format FDM printer and desktop CNC) is on order, not delivered. No segment electronics have been built yet, no URDF has been emitted, and no joint actuator family has been selected. The phases below sequence the work; explicit dates are deliberately not locked, and phrasing leans on dependency anchors (post parts arrival, after Phase X completes) rather than calendar deadlines.
+
+## Phase 0: substrate shakedown (in flight)
+
+The goal of Phase 0 is to prove out the lowest-level substrate (parametric CAD, the first mechanical part, the sensor breadboard, the fab pipeline tooling) before any segment is built.
+
+- build123d substrate. The CAD library is in active use. The lens-mount module is the seed; the next step is to promote it into a proper package with a top-level robot composer that takes a config file and emits every part for a named variant.
+- Lens-mount coupling parametric. Male and female bayonet halves export cleanly to STL, STEP, and PNG. A `scale_factor` parameter is to be threaded through the part so half-scale prototype mates can be validated.
+- Sensor pod breadboard validation. Once the first BNO085, VL53L5CX, and ESP32-S3 dev board land, the breadboard is wired per the Ferrolho reference layout, the viser viewer is run end to end, and clean reads are confirmed in hand before any segment is fabricated.
+- Hardware arrival. The large-format FDM printer and the desktop CNC are on order. First end-to-end fab pipeline run uses the lens-mount male and female pair as the test article.
+- Pipeline documentation. The end-to-end path from build123d to slicer to printer is documented as a repeatable process, including slicer profile per material.
+- Cleanup. Stale exporter code from the abandoned Blender / Phobos pipeline is removed.
+
+## Phase 1: one validated forearm segment (post parts arrival)
+
+The goal of Phase 1 is to take one body segment, the smallest and simplest available (forearm), all the way through fab, sensor integration, power, and bench validation. The forearm is chosen because it is a single-axis cylinder with low geometric risk and the smallest electronics envelope.
+
+- One validated forearm segment. The segment shell is parametrized, prints in one piece without internal supports, accepts a male lens-mount on one end and a female on the other, and houses the sensor pod, battery, and ESP32-S3 carrier without forced cable routing.
+- Sensor pod inside the segment. BNO085 plus four to six VL53L5CX, mounted on a small carrier (perfboard for v1, KiCad PCB later), with the IMU shielded by a folded mu-metal enclosure. Stable orientation stream and 8x8 ToF frames at >= 10 Hz.
+- Power harness for one segment. Local 18650 or 21700 pack, BMS, 3.3V and 5V regulators, current sense, over-current cutoff, and lens-mount contact allocation across the eight-pad ring (bus power, logic power, I2C, ID).
+- Fab pipeline shakedown. End-to-end FDM run on the lens-mount pair plus the forearm shell, with dimensional tolerance characterized against the CAD. End-to-end CNC run on at least one load-bearing aluminum bracket, with tolerance characterized against the CAD.
+- Bench validation gate. The forearm passes its own sensor checkout (clean reads, no stale frames, lens-mounts mate cleanly, power holds for >= 30 minutes under load) before any further segment work.
+
+Phase 1 depends on Phase 0 closing and the ordered hardware delivering. The sensor breadboard validation can run in parallel with the printer and CNC arriving.
+
+## Phase 2: limb assembly, joint mechanisms, simulator round-trip
+
+The goal of Phase 2 is to take the validated single segment up into a limb (forearm plus upper arm joined at an elbow joint), make the geometry round-trip cleanly to a simulator, and ship the per-segment firmware that lets a torso aggregator command joint targets.
+
+- Joint mechanisms. Per-joint variants land in the build123d library: revolute knee and elbow with offset motor and belt or direct drive (depending on the actuator pick), ball joint or 3-RRR spherical for shoulder and hip, 2-DOF revolute pair for wrist. The actuator final pick is a separate dedicated session; the substrate work proceeds against the curated option set.
+- End-effector v1. Rod stub by default: a parametric rod with a male lens-mount on one end and a domed cap on the other. Swaps out at the bayonet without forearm redesign if a hand or gripper is later wired in.
+- URDF / MJCF emitter. A custom emitter walks the assembled build123d Compound, extracts mass and inertia, emits link and joint blocks, references mesh STL files. The K-Scale `urdf2mjcf` converter handles the final stage to MuJoCo. The emitted URDF is validated against a known reference URDF for shape (link count, joint count, visual rendering).
+- ESP32-S3 segment firmware. Per-segment firmware reads IMU plus four to six ToF, manages I2C addressing across the ToF array, talks to the torso aggregator over the bus, drives any local actuator, runs a safety state machine that refuses motion on stale sensors or dropped torso heartbeat, and supports OTA flash from torso.
+- Torso companion compute. Pi 5 (default) or Jetson Orin Nano (if RL inference becomes the bottleneck) hosts the bus master, the state estimator, the control loop, and the persona-layer endpoint. Bus aggregation reads telemetry from all attached segments at >= 50 Hz.
+- ksim sim round-trip. Emitted MJCF loads cleanly into ksim, a standing-balance policy trains in MuJoCo first, walking and reaching follow. Domain randomization across mass, friction, and motor delay hardens against the sim-to-real gap.
+- Tripteron exo-shell harness in parallel. As a research arm, build a parametric tripteron in build123d, mount it on one elbow as an overlay, characterize the endpoint Cartesian sense and assist torque benefit. Not on the critical path.
+- Bench validation gates. Per-stage checklists at sensor checkout, sub-assembly motion test, full-body suspended pose, suspended walking on a treadmill. The safety rig (suspended harness on overhead structure) is non-optional for any stage that involves a body large enough to fall.
+
+Phase 2 depends on Phase 1 closing. Many of its sub-pieces (URDF emitter, segment firmware, torso compute) are independent and can run in parallel inside the phase.
+
+## Phase 3: walking biped and future persona integration
+
+The goal of Phase 3 is to take the body from "limb that moves under command" to "biped that walks under a sim-trained policy" and, beyond that, to the eventual binding to an agent persona that drives the body intentionally.
+
+- Walking biped. Free-standing walk on flat ground with a sim-trained policy, with the demo bar set at ten steps without intervention. Gets there through the validation gate sequence: sensor checkout, sub-assembly motion, suspended standing, suspended walking, free walking.
+- Bench validation, full sequence. Every gate from per-segment checkout through free walking has a written checklist; no stage advances until its gate passes; safety incidents are zero across the sequence.
+- Future persona integration. The body becomes the physical surface for an agent persona. That integration is intentionally deferred to a separate package, behind a stable interface, with the public body code calling into it. The interface contract (what observations the persona gets, what actions it can issue, the safety contract that bounds those actions) is the deliverable that Phase 3 owes whether or not the persona itself is ready when the body is. Body action surface stays scripted-policy-capable so the substrate is useful even before the persona binds.
+
+Phase 3 depends on Phase 2 closing. The persona-binding sub-piece is gated by a separate workstream that is not part of this repository.
+
+## Cross-cutting work
+
+Some pieces span multiple phases and do not slot cleanly into one. They run as side threads:
+
+- Power distribution maturity. The first-segment power module lands in Phase 1; bus-level power arbitration, hot-swap, and BMS at the torso harden through Phase 2 as more segments come online.
+- Fab pipeline maturity. The pipeline lands in Phase 1; slicer profile tuning per material, CAM template library, and post-process notes per part class accrete through every phase as new part classes appear.
+- build123d library growth. The library scaffold lands in Phase 0; new part classes (segments, joints, end-effectors, power housings) accrete as each phase introduces them. Every part propagates `scale_factor` uniformly. Every part has a `build()` test under pytest.
+- Sourcing strategy. Premium-fast suppliers for known-good prototype parts; bulk overseas suppliers for scaled buys with longer lead times; same-day local suppliers for hardware and stock. Strategy is steady; only the per-part sourcing decisions change phase to phase.

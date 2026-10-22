@@ -1,7 +1,7 @@
 """Build every parametric part and write artifacts to design/build/.
 
 Run from repo root:  python -m design.build_all
-Or directly:         python Z:/_research/embodied/design/build_all.py
+Or directly:         python design/build_all.py
 """
 
 from __future__ import annotations

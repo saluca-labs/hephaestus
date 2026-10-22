@@ -1,0 +1,11 @@
+Image: lens-mount-preview-2026-10-22.png
+Captured: 2026-10-22, from a fresh clone of saluca-labs/hephaestus at commit cfdb8e0 (origin/main).
+Runtime: Python 3.12.10 on Windows 11, build123d 0.13.0, matplotlib 3.11.2, trimesh 5.1.1.
+Commands (from the repo root):
+  pip install build123d matplotlib trimesh
+  python -m design.build_all
+The image is design/build/lens_mount_preview.png exactly as build_all.py wrote it
+(its own matplotlib 3D preview of the generated male and female STL meshes),
+copied here unmodified. Nothing was drawn or edited by hand.
+Known issue visible in the image: the male part has ONE tab (right-hand side)
+and the female part ONE pass-through slot, not three. See README "Status".

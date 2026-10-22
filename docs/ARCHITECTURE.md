@@ -6,6 +6,8 @@ Hephaestus is a modular, sensor-rich humanoid substrate, designed in the open un
 
 This document captures the architectural calls that are locked, the questions that remain open, and the adjacencies that informed the design.
 
+> **Correction, 2026-10-22.** This document said Hephaestus is "designed in the open under MIT". Since commit `cfdb8e0` (2026-08-18) the repository is licensed under FSL-1.1-ALv2; see [LICENSE](../LICENSE). It also describes a `scale_factor` parameter as present across every part class; as of 2026-10-22 no `scale_factor` exists in the code (`LensMountParams` has none), and the roadmap lists threading it through as future work. Statements in this document describe the intended design, not built hardware.
+
 ## Locked architectural decisions
 
 These calls are committed and should not be re-litigated without explicit reason.
