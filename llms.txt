@@ -1,0 +1,34 @@
+# hephaestus
+
+> Design repository for a modular humanoid robot built from smart body segments. Today it contains one parametric part, a lens-mount bayonet coupling in build123d (Python CAD) that exports STL, STEP and a PNG preview, plus architecture and roadmap documents. FSL-1.1-ALv2.
+
+Facts agents often get wrong: this is pre-alpha design work, not a working robot; the only code is `design/lens_mount.py` and `design/build_all.py`; no electronics, firmware, URDF emitter or simulator integration exist yet, and the ARCHITECTURE and ROADMAP documents describe intent. As of 2026-10-22 the generated coupling has one tab and one slot instead of three, and the male and female halves do not interlock (both known issues, measured, see the README). The licence is FSL-1.1-ALv2 since 2026-08-18, not MIT. Install with `pip install build123d matplotlib trimesh`; there is no package metadata.
+
+If a command, class, function or file is not listed in the public surface below, it does not exist in this repository.
+
+## Public surface
+
+- `python -m design.build_all` (or `python design/build_all.py`): builds male and female couplings and writes `lens_mount_male.stl`, `lens_mount_male.step`, `lens_mount_female.stl`, `lens_mount_female.step` and `lens_mount_preview.png` to `design/build/`. Takes no arguments.
+- `design.LensMountParams`: dataclass of every dimension (millimetres and degrees), all with defaults.
+- `design.LensMount(side="male" | "female", params=None)`: `build()` returns a build123d `Compound`; `export(out_dir)` writes `lens_mount_<side>.stl` and `.step` and returns `{"stl": path, "step": path}`.
+
+## Start here
+
+- [README](https://github.com/saluca-labs/hephaestus/blob/main/README.md): status, known issues with a script that re-derives them, how-it-works diagram, install, quickstart, usage, corrections
+- [AGENTS.md](https://github.com/saluca-labs/hephaestus/blob/main/AGENTS.md): read order, what exists and what does not, the only numbers to trust, how to build and check
+
+## Code
+
+- [design/lens_mount.py](https://github.com/saluca-labs/hephaestus/blob/main/design/lens_mount.py): `LensMountParams` (all dimensions) and `LensMount` (build, export STL and STEP)
+- [design/build_all.py](https://github.com/saluca-labs/hephaestus/blob/main/design/build_all.py): builds every part into design/build/ and renders the preview PNG
+
+## Design intent (not built)
+
+- [Architecture](https://github.com/saluca-labs/hephaestus/blob/main/docs/ARCHITECTURE.md): locked design decisions and open questions
+- [Roadmap](https://github.com/saluca-labs/hephaestus/blob/main/docs/ROADMAP.md): phased plan, Phase 0 to Phase 3
+
+## Optional
+
+- [llms-full.txt](https://github.com/saluca-labs/hephaestus/blob/main/llms-full.txt): README, ARCHITECTURE and ROADMAP in one file
+- [NOTICE](https://github.com/saluca-labs/hephaestus/blob/main/NOTICE): upstream credits (K-Scale Labs, Henrique Ferrolho, build123d)
+- [LICENSE](https://github.com/saluca-labs/hephaestus/blob/main/LICENSE): Functional Source License 1.1, Apache 2.0 future licence
