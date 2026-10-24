@@ -1,3 +1,5 @@
+![hephaestus](docs/img/banner-2026-10-23.jpg)
+
 # Hephaestus
 
 Modular humanoid robotics substrate: the open design home for a humanoid built from smart body segments, starting with a parametric lens-mount coupling generated in Python with build123d.
